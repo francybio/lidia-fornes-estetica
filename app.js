@@ -73,14 +73,16 @@ const PACKS = [
 ];
 const TIERS = [[90, .20], [80, .14], [70, .10], [60, .05]];
 
+// c = título del paso · d = explicación corta (catalán e inglés en i18n.js → steps)
 const STEPS = [
-  { src: 'cabina_2.jpg', s: 'Paso 01', c: 'Limpieza y masaje para preparar la piel' },
-  { src: 'cabina_30.jpg', s: 'Paso 02', c: 'Sérum aplicado gota a gota' },
-  { src: 'cabina_36.jpg', s: 'Paso 03', c: 'Drenaje suave de cuello y escote' },
-  { src: 'cabina_46.jpg', s: 'Paso 04', c: 'Mascarilla a pincel, adaptada a tu piel' },
-  { src: 'cabina_76.jpg', s: 'Paso 05', c: 'Extracción cuidadosa de impurezas' },
-  { src: 'cabina_41.jpg', s: 'Paso 06', c: 'Masaje relajante de cuello y hombros' },
-  { src: 'cabina_96.jpg', s: 'Paso 07', c: 'Masaje final: ese efecto buena cara' }
+  { src: 'cabina_2.jpg', c: 'Limpieza y masaje para preparar la piel', d: 'Retiramos el maquillaje y la suciedad del día con un limpiador suave. Un masaje ligero relaja la piel y la prepara para lo que viene.' },
+  { src: 'cabina_30.jpg', c: 'Sérum aplicado gota a gota', d: 'Ponemos unas gotas de sérum, un concentrado que hidrata y nutre. Lo extendemos con las yemas de los dedos hasta que la piel lo absorbe.' },
+  { src: 'cabina_36.jpg', c: 'Drenaje suave de cuello y escote', d: 'Con movimientos lentos y suaves en el cuello y el escote ayudamos a deshinchar y a soltar tensión. La cara se ve más descansada.' },
+  { src: 'cabina_46.jpg', c: 'Mascarilla a pincel, adaptada a tu piel', d: 'Elegimos la mascarilla según lo que necesite tu piel (hidratar, calmar o purificar) y la aplicamos con pincel. La dejamos actuar unos minutos.' },
+  { src: 'cabina_62.jpg', c: 'Retirada con toallas húmedas', d: 'Quitamos la mascarilla con toallas húmedas, con cuidado y sin frotar. La piel queda limpia y lista para el siguiente paso.' },
+  { src: 'cabina_76.jpg', c: 'Extracción cuidadosa de impurezas', d: 'Con guantes y mucho cuidado, limpiamos los poros de puntos negros e impurezas. Así la piel respira mejor y se ve más uniforme.' },
+  { src: 'cabina_41.jpg', c: 'Masaje relajante de cuello y hombros', d: 'Un masaje para soltar la tensión que acumulamos en el cuello y los hombros. Es el momento de desconectar del todo.' },
+  { src: 'cabina_96.jpg', c: 'Masaje final: ese efecto buena cara', d: 'Terminamos con la crema adecuada para tu piel y un último masaje facial. Sales con la piel luminosa, hidratada y con cara de descanso.' }
 ];
 const STORIES = [
   { src: 'DUQtpjYjNts_0.jpg', w: 'Febrero' }, { src: 'DUQtpjYjNts_1.jpg', w: 'Febrero' },
@@ -105,6 +107,62 @@ const store = {
 };
 const waLink = text => `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(text)}`;
 
+/* ----------------------------------------------------------
+   IDIOMAS (es por defecto · ca · en) — textos en i18n.js
+---------------------------------------------------------- */
+const LANGS = ['es', 'ca', 'en'];
+const DICT = window.LF_I18N || {};
+let LANG = (() => {
+  const q = new URLSearchParams(location.search).get('lang');
+  if (LANGS.includes(q)) return q;
+  const saved = store.get('lf-lang', 'es');
+  return LANGS.includes(saved) ? saved : 'es';
+})();
+const fill = (str, v) => v ? str.replace(/\{(\w+)\}/g, (m, k) => (k in v ? v[k] : m)) : str;
+// T: texto por clave · N: nombre de tratamiento/zona/mes (la clave es el nombre en español)
+const T = (k, v) => fill((DICT[LANG] && DICT[LANG][k]) ?? (DICT.es && DICT.es[k]) ?? k, v);
+const N = name => (DICT[LANG] && DICT[LANG].names && DICT[LANG].names[name]) || name;
+const num = (n, dec) => n.toFixed(dec).replace('.', LANG === 'en' ? '.' : ',');
+const langHooks = [];
+const onLang = fn => langHooks.push(fn);
+const ORIG = new Map();     // texto original (español) de cada elemento traducible
+function applyLang() {
+  const d = LANG === 'es' ? {} : (DICT[LANG] || {});
+  document.documentElement.lang = LANG;
+  $$('[data-i18n]').forEach(el => {
+    if (!ORIG.has(el)) ORIG.set(el, el.innerHTML);
+    el.innerHTML = d[el.dataset.i18n] ?? ORIG.get(el);
+  });
+  $$('[data-i18n-attr]').forEach(el => {
+    el.dataset.i18nAttr.split(';').forEach(pair => {
+      const [attr, key] = pair.split(':');
+      const id = 'attr:' + attr;
+      if (!el[id]) el[id] = el.getAttribute(attr) || '';
+      el.setAttribute(attr, d[key] ?? el[id]);
+    });
+  });
+  $$('[data-lang]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === LANG)));
+}
+function setLang(l) {
+  if (!LANGS.includes(l) || l === LANG) return;
+  LANG = l;
+  store.set('lf-lang', l);
+  try {
+    const u = new URL(location.href);
+    if (l === 'es') u.searchParams.delete('lang'); else u.searchParams.set('lang', l);
+    history.replaceState(null, '', u);
+  } catch (e) { /* sin history */ }
+  applyLang();
+  langHooks.forEach(fn => fn());
+}
+function setupLang() {
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-lang]');
+    if (b) setLang(b.dataset.lang);
+  });
+  applyLang();
+}
+
 let toastT;
 function toast(msg) {
   const t = $('.toast');
@@ -124,19 +182,24 @@ function madridNow() {
   return { d: wd, m: parseInt(get('hour'), 10) * 60 + parseInt(get('minute'), 10) };
 }
 const hhmm = m => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+const dayName = i => ((DICT[LANG] && DICT[LANG].days) || DAY_NAMES)[i];
 function getStatus() {
   const { d, m } = madridNow();
   const today = HOURS[d];
   if (today) {
-    for (const [a, b] of today) if (m >= a && m < b) return { open: true, text: `Abierto · cierra a las ${hhmm(b)}` };
+    for (const [a, b] of today) if (m >= a && m < b) return { open: true, text: T('status.open', { t: hhmm(b) }) };
     const next = today.find(([a]) => m < a);
-    if (next) return { open: false, text: `Cerrado · abre a las ${hhmm(next[0])}` };
+    if (next) return { open: false, text: T('status.opensAt', { t: hhmm(next[0]) }) };
   }
   for (let i = 1; i <= 7; i++) {
     const nd = (d + i) % 7;
-    if (HOURS[nd]) return { open: false, text: `Cerrado · abre ${i === 1 ? 'mañana' : DAY_NAMES[nd].toLowerCase()} a las ${hhmm(HOURS[nd][0][0])}` };
+    if (!HOURS[nd]) continue;
+    const t = hhmm(HOURS[nd][0][0]);
+    if (i === 1) return { open: false, text: T('status.opensTomorrow', { t }) };
+    const day = dayName(nd);
+    return { open: false, text: T('status.opensDay', { t, d: LANG === 'en' ? day : day.toLowerCase() }) };
   }
-  return { open: false, text: 'Cerrado' };
+  return { open: false, text: T('status.closed') };
 }
 function renderStatus() {
   const s = getStatus();
@@ -150,8 +213,8 @@ function renderHours() {
   const order = [1, 2, 3, 4, 5, 6, 0];
   $('.hours').innerHTML = order.map(i => {
     const h = HOURS[i];
-    const txt = h ? h.map(([a, b]) => `${hhmm(a)}–${hhmm(b)}`).join(' · ') : 'Cerrado';
-    return `<li class="${i === d ? 'is-today' : ''}"><span>${DAY_NAMES[i]}</span><span>${txt}</span></li>`;
+    const txt = h ? h.map(([a, b]) => `${hhmm(a)}–${hhmm(b)}`).join(' · ') : T('status.closed');
+    return `<li class="${i === d ? 'is-today' : ''}"><span>${dayName(i)}</span><span>${txt}</span></li>`;
   }).join('');
 }
 
@@ -159,7 +222,7 @@ function renderHours() {
    WHATSAPP
 ---------------------------------------------------------- */
 function setupWa() {
-  const href = waLink('¡Hola Lídia! Me gustaría pedir cita 🌸');
+  const href = waLink(T('wa.hello'));
   $$('[data-wa]').forEach(a => a.setAttribute('href', href));
 }
 
@@ -168,11 +231,29 @@ function setupWa() {
 ---------------------------------------------------------- */
 let bag = store.get('lf-bag', []);
 function bagSave() { store.set('lf-bag', bag); }
+// cada línea guarda de dónde sale (src) para poder mostrarla en el idioma elegido
+function itemText(i) {
+  const s = i.src;
+  if (s && s.t === 'c') {
+    const c = CARTA[s.c], it = c && c.items[s.i];
+    if (it) return { name: N(it[0]), note: N(c.name) };
+  }
+  if (s && s.t === 'promo') return { name: T('promo.bagName'), note: T('promo.bagNote') };
+  if (s && s.t === 'laser') {
+    const pack = s.pack && PACKS.find(p => p.id === s.pack);
+    const zones = s.z.map(N).join(', ');
+    if (pack) return { name: T('laser.bagPack', { n: N(pack.n) }), note: pack.fixed ? T('laser.fixedPackLower') : zones };
+    return { name: T('laser.bagCustom'), note: zones + (s.rate ? ` · −${Math.round(s.rate * 100)}%` : '') };
+  }
+  return { name: i.name || '', note: i.note || '' };
+}
 function bagAdd(item, silent) {
-  bag.push({ id: item.id || ('i' + Date.now() + Math.random().toString(16).slice(2, 6)), name: item.name, price: item.price, note: item.note || '' });
+  const entry = { id: item.id || ('i' + Date.now() + Math.random().toString(16).slice(2, 6)), price: item.price, src: item.src || null };
+  Object.assign(entry, itemText(Object.assign({}, item, entry)));
+  bag.push(entry);
   bagSave(); renderBag();
   const b = $('.bagbtn'); b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump');
-  if (!silent) toast(`“${item.name}” añadido a Mi cita`);
+  if (!silent) toast(T('toast.added', { n: entry.name }));
 }
 function bagRemove(id) { bag = bag.filter(i => i.id !== id); bagSave(); renderBag(); syncCartaButtons(); }
 function renderBag() {
@@ -181,14 +262,14 @@ function renderBag() {
   $$('[data-bag-count]').forEach(el => el.textContent = n);
   $('.bagbtn').classList.toggle('has-items', n > 0);
   if (!n) {
-    list.innerHTML = '<li class="bag__empty">Tu cita está vacía.<br>Añade tratamientos desde Servicios o crea tu pack láser ✿</li>';
+    list.innerHTML = `<li class="bag__empty">${T('bag.empty')}</li>`;
   } else {
-    list.innerHTML = bag.map(i => `<li><div>${i.name}${i.note ? `<small>${i.note}</small>` : ''}</div><strong>${eur(i.price)}</strong><button type="button" data-rm="${i.id}" aria-label="Quitar ${i.name}">×</button></li>`).join('');
+    list.innerHTML = bag.map(i => { const x = itemText(i); return `<li><div>${x.name}${x.note ? `<small>${x.note}</small>` : ''}</div><strong>${eur(i.price)}</strong><button type="button" data-rm="${i.id}" aria-label="${T('bag.removeItem', { n: x.name })}">×</button></li>`; }).join('');
   }
   const total = bag.reduce((s, i) => s + i.price, 0);
   $('[data-bag-total]').textContent = eur(total);
-  const lines = bag.map(i => `• ${i.name}${i.note ? ` (${i.note})` : ''} — ${eur(i.price)}`).join('\n');
-  const msg = n ? `¡Hola Lídia! 🌸 Me gustaría pedir cita para:\n${lines}\n\nTotal aproximado: ${eur(total)}\n¿Qué día tendríais disponible?` : '¡Hola Lídia! Me gustaría pedir cita 🌸';
+  const lines = bag.map(i => { const x = itemText(i); return `• ${x.name}${x.note ? ` (${x.note})` : ''} — ${eur(i.price)}`; }).join('\n');
+  const msg = n ? T('wa.bag', { lines, total: eur(total) }) : T('wa.hello');
   const send = $('[data-bag-send]');
   send.setAttribute('href', waLink(msg));
   send.classList.toggle('is-disabled', !n);
@@ -218,7 +299,7 @@ function syncCartaButtons() {
   $$('.mrow__add').forEach(b => {
     const on = bag.some(x => x.id === b.dataset.id);
     b.classList.toggle('is-in', on);
-    b.setAttribute('aria-label', on ? 'Quitar de mi cita' : 'Añadir a mi cita');
+    b.setAttribute('aria-label', on ? T('bag.removeAria') : T('bag.add'));
   });
 }
 function renderCarta(animateImg) {
@@ -226,20 +307,25 @@ function renderCarta(animateImg) {
   $$('.tab').forEach((t, i) => t.setAttribute('aria-selected', String(i === cartaCat)));
   $('[data-menu-list]').innerHTML = cat.items.map(([n, p], i) => `
     <li class="mrow" style="animation-delay:${i * 55}ms">
-      <span class="mrow__name">${n}</span>
+      <span class="mrow__name">${N(n)}</span>
       <span class="mrow__price">${p}€</span>
-      <button type="button" class="mrow__add" data-id="${cartaId(cartaCat, i)}" data-i="${i}" aria-label="Añadir a mi cita"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button type="button" class="mrow__add" data-id="${cartaId(cartaCat, i)}" data-i="${i}" aria-label="${T('bag.add')}"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
     </li>`).join('');
-  $('[data-carta-cat]').textContent = cat.name;
+  $('[data-carta-cat]').textContent = N(cat.name);
   const img = $('[data-carta-img]');
+  img.alt = N(cat.name);
   if (animateImg) {
     img.classList.add('is-swap');
     setTimeout(() => { img.src = IMG(cat.img); img.onload = () => img.classList.remove('is-swap'); }, 280);
   }
   syncCartaButtons();
 }
+function renderTabs() {
+  $('.tabs').innerHTML = CARTA.map((c, i) => `<button class="tab" role="tab" type="button" data-i="${i}">${N(c.name)} <b>${c.items.length}</b></button>`).join('');
+}
 function setupCarta() {
-  $('.tabs').innerHTML = CARTA.map((c, i) => `<button class="tab" role="tab" type="button" data-i="${i}">${c.name} <b>${c.items.length}</b></button>`).join('');
+  renderTabs();
+  onLang(() => { renderTabs(); renderCarta(false); });
   $('.tabs').addEventListener('click', e => {
     const t = e.target.closest('.tab');
     if (!t || +t.dataset.i === cartaCat) return;
@@ -251,8 +337,8 @@ function setupCarta() {
     if (!b) return;
     const id = b.dataset.id;
     if (bag.some(x => x.id === id)) { bagRemove(id); return; }
-    const [n, p] = CARTA[cartaCat].items[+b.dataset.i];
-    bagAdd({ id, name: n, price: p, note: CARTA[cartaCat].name });
+    const [, p] = CARTA[cartaCat].items[+b.dataset.i];
+    bagAdd({ id, price: p, src: { t: 'c', c: cartaCat, i: +b.dataset.i } });
     syncCartaButtons();
   });
   renderCarta(false);
@@ -283,9 +369,9 @@ function setupScratch() {
     ctx.globalAlpha = .55; ctx.fillStyle = '#5B1F55';
     ctx.font = `400 ${Math.max(26, r.width / 14)}px 'Pinyon Script', cursive`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('Rasca y descubre', r.width / 2, r.height / 2 - 6);
+    ctx.fillText(T('promo.foil1'), r.width / 2, r.height / 2 - 6);
     ctx.globalAlpha = .45; ctx.font = `700 12px Quicksand, sans-serif`;
-    ctx.fillText('PROMO DE OCTUBRE · ✿ · LÍDIA FORNÉS', r.width / 2, r.height / 2 + r.width / 18);
+    ctx.fillText(T('promo.foil2'), r.width / 2, r.height / 2 + r.width / 18);
     ctx.globalAlpha = 1;
   }
   function pos(e) { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
@@ -311,7 +397,7 @@ function setupScratch() {
     wrap.classList.add('is-done', 'is-touched');
     addBtn.classList.remove('is-disabled');
     const fl = $('[data-flip]'); if (fl) fl.classList.add('is-flipped');
-    toast('¡Destapada! 115€ → 55€ este mes 💜');
+    toast(T('promo.revealed'));
     burstPetals(wrap);
   }
   cv.addEventListener('pointerdown', e => { if (done) return; drawing = true; wrap.classList.add('is-touched'); last = null; cv.setPointerCapture(e.pointerId); scratchAt(pos(e)); });
@@ -319,9 +405,10 @@ function setupScratch() {
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => cv.addEventListener(t, () => { drawing = false; last = null; }));
   $('[data-promo-reveal]').addEventListener('click', reveal);
   addBtn.addEventListener('click', () => {
-    if (bag.some(x => x.id === 'promo-oct')) { toast('Ya está en Mi cita ✿'); return; }
-    bagAdd({ id: 'promo-oct', name: 'Promo octubre · Facial iluminador + regenerador', price: 55, note: 'antes 115€' });
+    if (bag.some(x => x.id === 'promo-oct')) { toast(T('promo.already')); return; }
+    bagAdd({ id: 'promo-oct', price: 55, src: { t: 'promo' } });
   });
+  onLang(() => { if (!done) paint(); });
   const ro = new ResizeObserver(() => { if (!done) paint(); });
   ro.observe(wrap);
   if (document.fonts) document.fonts.ready.then(() => { if (!done) paint(); });
@@ -410,15 +497,15 @@ function renderLaser() {
   // ticket
   const list = $('[data-pack-list]');
   list.innerHTML = calc.items.length
-    ? calc.items.map((i, n) => `<li style="animation-delay:${n * 40}ms"><span>${i.n}</span><span>${eur(i.p)}</span></li>`).join('')
-    : '<li class="ticket__empty">Aún no has elegido zonas. Empieza tocando la silueta ✿</li>';
+    ? calc.items.map((i, n) => `<li style="animation-delay:${n * 40}ms"><span>${N(i.n)}</span><span>${eur(i.p)}</span></li>`).join('')
+    : `<li class="ticket__empty">${T('laser.empty')}</li>`;
   $('[data-sub]').textContent = eur(calc.sub);
   $('[data-pack-badge]').hidden = !calc.pack;
   if (calc.pack) {
-    $('[data-disc-label]').textContent = 'Precio pack cerrado';
+    $('[data-disc-label]').textContent = T('laser.fixedPrice');
     $('[data-disc]').textContent = calc.sub > calc.total ? `−${eur(calc.sub - calc.total)}` : '✓';
   } else {
-    $('[data-disc-label]').textContent = calc.rate ? `Descuento −${Math.round(calc.rate * 100)}%` : 'Descuento';
+    $('[data-disc-label]').textContent = calc.rate ? T('laser.discountPct', { p: Math.round(calc.rate * 100) }) : T('laser.discount');
     $('[data-disc]').textContent = calc.rate ? `−${eur(calc.sub * calc.rate)}` : '—';
   }
   $('[data-total]').textContent = eur(calc.total);
@@ -427,19 +514,23 @@ function renderLaser() {
   $('[data-tier-fill]').style.width = pct + '%';
   $$('.tiers__marks span').forEach((s, i) => s.classList.toggle('is-hit', calc.sub >= [60, 70, 80, 90][i]));
   let msg;
-  if (calc.pack) msg = `✿ ${calc.pack.n}: precio especial.`;
-  else if (!calc.sub) msg = 'A partir de 60€ en zonas, empieza el descuento.';
+  if (calc.pack) msg = T('laser.msgPack', { n: N(calc.pack.n) });
+  else if (!calc.sub) msg = T('laser.msgStart');
   else {
     const next = [...TIERS].reverse().find(([min]) => calc.sub < min);
-    msg = next ? `Te faltan ${eur(next[0] - calc.sub)} para el −${Math.round(next[1] * 100)}%` : '¡Tienes el descuento máximo: −20%! 🎉';
+    msg = next ? T('laser.msgNext', { a: eur(next[0] - calc.sub), p: Math.round(next[1] * 100) }) : T('laser.msgMax');
   }
   $('[data-tier-msg]').textContent = msg;
   $('[data-laser-add]').classList.toggle('is-disabled', !calc.items.length);
 }
+function renderLaserLabels() {
+  $('[data-face-chips]').innerHTML = FACE.map(f => `<button type="button" class="chip" data-k="${f.k}" data-male="${f.male ? 1 : 0}">${N(f.n)} <b>${f.p}€</b></button>`).join('');
+  $('[data-packs]').innerHTML = PACKS.map(p => `<button type="button" class="pack" data-id="${p.id}">${N(p.n)}<b>${p.p}€</b></button>`).join('');
+}
 function setupLaser() {
   const fig = $('.figure');
-  $('[data-face-chips]').innerHTML = FACE.map(f => `<button type="button" class="chip" data-k="${f.k}" data-male="${f.male ? 1 : 0}">${f.n} <b>${f.p}€</b></button>`).join('');
-  $('[data-packs]').innerHTML = PACKS.map(p => `<button type="button" class="pack" data-id="${p.id}">${p.n}<b>${p.p}€</b></button>`).join('');
+  renderLaserLabels();
+  onLang(() => { renderLaserLabels(); renderLaser(); });
 
   fig.addEventListener('click', e => {
     const el = e.target.closest('.z');
@@ -448,18 +539,18 @@ function setupLaser() {
     const k = el.dataset.z;
     let label = '';
     if (k === 'facial') {
-      if (L.face.has('facial')) { L.face.delete('facial'); label = 'Facial completo · quitado'; }
-      else { ['entrecejo', 'labio', 'menton', 'pomulos', 'patillas'].forEach(x => L.face.delete(x)); L.face.add('facial'); label = 'Facial completo · 13€'; }
+      if (L.face.has('facial')) { L.face.delete('facial'); label = T('laser.tipRemoved', { n: N('Facial completo') }); }
+      else { ['entrecejo', 'labio', 'menton', 'pomulos', 'patillas'].forEach(x => L.face.delete(x)); L.face.add('facial'); label = `${N('Facial completo')} · 13€`; }
     } else if (k === 'brazos' || k === 'piernas') {
       const want = el.dataset.part === 'low' ? 1 : 2;
       L.z[k] = L.z[k] === want ? 0 : want;
-      label = L.z[k] ? `${ZONES[k].lv[L.z[k]].n} · ${ZONES[k].lv[L.z[k]].p}€` : `${k === 'brazos' ? 'Brazos' : 'Piernas'} · quitado`;
+      label = L.z[k] ? `${N(ZONES[k].lv[L.z[k]].n)} · ${ZONES[k].lv[L.z[k]].p}€` : T('laser.tipRemoved', { n: N(k === 'brazos' ? 'Brazos' : 'Piernas') });
     } else if (k === 'ingles') {
       L.z[k] = ((L.z[k] || 0) + 1) % 3;
-      label = L.z[k] ? `${ZONES[k].lv[L.z[k]].n} · ${ZONES[k].lv[L.z[k]].p}€${L.z[k] === 1 ? ' (toca otra vez: pubis completo)' : ''}` : 'Ingles · quitado';
+      label = L.z[k] ? `${N(ZONES[k].lv[L.z[k]].n)} · ${ZONES[k].lv[L.z[k]].p}€${L.z[k] === 1 ? T('laser.tipAgain') : ''}` : T('laser.tipRemoved', { n: N('Ingles') });
     } else {
       L.z[k] = L.z[k] ? 0 : 1;
-      label = `${ZONES[k].n} · ${L.z[k] ? ZONES[k].p + '€' : 'quitado'}`;
+      label = L.z[k] ? `${N(ZONES[k].n)} · ${ZONES[k].p}€` : T('laser.tipRemoved', { n: N(ZONES[k].n) });
     }
     $$(`.figure [data-z="${k}"]`).forEach(z => { z.classList.remove('pop'); void z.getBoundingClientRect(); z.classList.add('pop'); });
     laserTip(label);
@@ -519,10 +610,7 @@ function setupLaser() {
   $('[data-laser-add]').addEventListener('click', () => {
     const c = laserCalc();
     if (!c.items.length) return;
-    const zones = c.items.map(i => i.n).join(', ');
-    const name = c.pack ? `Láser · ${c.pack.n}` : 'Pack láser a medida';
-    const note = c.pack ? (c.pack.fixed ? 'pack cerrado' : zones) : `${zones}${c.rate ? ` · −${Math.round(c.rate * 100)}%` : ''}`;
-    bagAdd({ name, price: Math.round(c.total * 100) / 100, note });
+    bagAdd({ price: Math.round(c.total * 100) / 100, src: { t: 'laser', pack: c.pack ? c.pack.id : null, z: c.items.map(i => i.n), rate: c.rate } });
   });
   setSex('mujer');
 }
@@ -535,9 +623,25 @@ function setupCoverflow() {
   const track = $('[data-cf-track]');
   const n = STEPS.length;
   let cur = 0, timer = null, hover = false;
-  track.innerHTML = STEPS.map((s, i) => `<figure class="cf__card" data-i="${i}"><img src="${IMG(s.src)}" alt="${s.c}" loading="lazy" draggable="false"><span class="cf__step">${s.s}</span></figure>`).join('');
+  const stepText = i => (DICT[LANG] && DICT[LANG].steps && DICT[LANG].steps[i]) || STEPS[i];
+  const stepNo = i => String(i + 1).padStart(2, '0');
+  track.innerHTML = STEPS.map((s, i) => `<figure class="cf__card" data-i="${i}"><img src="${IMG(s.src)}" alt="" loading="lazy" draggable="false"><span class="cf__step"></span></figure>`).join('');
   const cards = $$('.cf__card', track);
-  $('[data-cf-n]').textContent = String(n).padStart(2, '0');
+  const title = $('[data-cf-caption]'), desc = $('[data-cf-desc]');
+  let shown = -1;
+  function labels() {
+    cards.forEach((c, i) => { $('img', c).alt = stepText(i).c; $('.cf__step', c).textContent = T('cf.step', { n: stepNo(i) }); });
+  }
+  function caption(force) {
+    if (cur === shown && !force) return;
+    shown = cur;
+    title.textContent = stepText(cur).c;
+    desc.textContent = stepText(cur).d;
+    if (!reduce && title.animate) [title, desc].forEach((el, k) => el.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 500, delay: k * 70, easing: 'cubic-bezier(.2,.7,.1,1)', fill: 'backwards' }));
+  }
+  labels();
+  onLang(() => { labels(); caption(true); });
+  $('[data-cf-n]').textContent = stepNo(n - 1);
   function layout() {
     const w = root.clientWidth;
     const spread = Math.min(w * .36, 420);
@@ -551,8 +655,8 @@ function setupCoverflow() {
       c.style.zIndex = 50 - a;
       c.style.pointerEvents = a > 2 ? 'none' : 'auto';
     });
-    $('[data-cf-i]').textContent = String(cur + 1).padStart(2, '0');
-    $('[data-cf-caption]').textContent = STEPS[cur].c;
+    $('[data-cf-i]').textContent = stepNo(cur);
+    caption();
   }
   const go = i => { cur = (i + n) % n; layout(); };
   const play = () => { stop(); if (!reduce) timer = setInterval(() => { if (!hover && !document.hidden) go(cur + 1); }, 4200); };
@@ -607,15 +711,18 @@ function setupStory() {
   const frames = $('[data-story-frames]');
   const bars = $('[data-story-bars]');
   const DUR = 4600;
-  frames.innerHTML = STORIES.map((s, i) => `<img src="${IMG(s.src)}" alt="Promo de ${s.w} publicada en Instagram" loading="lazy" data-i="${i}">`).join('');
+  frames.innerHTML = STORIES.map((s, i) => `<img src="${IMG(s.src)}" alt="" loading="lazy" data-i="${i}">`).join('');
   bars.innerHTML = STORIES.map(() => '<i><span></span></i>').join('');
   const imgs = $$('img', frames), segs = $$('i', bars);
+  const alts = () => imgs.forEach((im, k) => { im.alt = T('story.alt', { w: N(STORIES[k].w) }); });
+  alts();
+  onLang(() => { alts(); $('[data-story-when]').textContent = N(STORIES[cur].w); });
   let cur = 0, prog = 0, last = performance.now(), paused = true, visible = false;
   function show(i) {
     cur = (i + STORIES.length) % STORIES.length;
     imgs.forEach((im, k) => im.classList.toggle('is-on', k === cur));
     segs.forEach((s, k) => { s.classList.toggle('is-done', k < cur); $('span', s).style.width = k < cur ? '100%' : '0%'; });
-    $('[data-story-when]').textContent = STORIES[cur].w;
+    $('[data-story-when]').textContent = N(STORIES[cur].w);
     prog = 0;
   }
   function tick(now) {
@@ -700,9 +807,9 @@ function setupCursor() {
   let x = -100, y = -100, cx = x, cy = y;
   window.addEventListener('pointermove', e => { x = e.clientX; y = e.clientY; });
   (function loop() { cx += (x - cx) * .2; cy += (y - cy) * .2; c.style.transform = `translate(${cx}px,${cy}px)`; requestAnimationFrame(loop); })();
-  const targets = [['[data-cf]', 'arrastra'], ['[data-reel]', 'play'], ['[data-story]', 'toca'], ['.scratch', 'rasca'], ['.figure', 'elige']];
-  targets.forEach(([sel, txt]) => $$(sel).forEach(el => {
-    el.addEventListener('mouseenter', () => { c.classList.add('is-big'); label.textContent = txt; });
+  const targets = [['[data-cf]', 'cur.drag'], ['[data-reel]', 'cur.play'], ['[data-story]', 'cur.tap'], ['.scratch', 'cur.scratch'], ['.figure', 'cur.pick']];
+  targets.forEach(([sel, key]) => $$(sel).forEach(el => {
+    el.addEventListener('mouseenter', () => { c.classList.add('is-big'); label.textContent = T(key); });
     el.addEventListener('mouseleave', () => c.classList.remove('is-big'));
   }));
   $$('.magnetic').forEach(b => {
@@ -749,13 +856,14 @@ function countUp(el) {
   const t0 = performance.now(), D = 1600;
   (function f(now) {
     const k = Math.min((now - t0) / D, 1), e = 1 - Math.pow(1 - k, 3);
-    el.textContent = pre + (to * e).toFixed(dec).replace('.', ',');
-    if (k < 1) requestAnimationFrame(f);
+    el.textContent = pre + num(to * e, dec);
+    if (k < 1) requestAnimationFrame(f); else el.dataset.counted = '1';
   })(t0);
 }
 function setupCounters() {
   const io = new IntersectionObserver(ens => ens.forEach(en => { if (en.isIntersecting) { countUp(en.target); io.unobserve(en.target); } }), { threshold: .6 });
   $$('[data-count]').forEach(el => io.observe(el));
+  onLang(() => $$('[data-count][data-counted]').forEach(el => { el.textContent = (el.dataset.prefix || '') + num(parseFloat(el.dataset.count), +(el.dataset.dec || 0)); }));
 }
 
 /* ----------------------------------------------------------
@@ -817,8 +925,10 @@ function runLoader() {
    INIT
 ---------------------------------------------------------- */
 function init() {
+  setupLang();
   setupWa();
   renderStatus(); renderHours(); setInterval(renderStatus, 60000);
+  onLang(() => { setupWa(); renderStatus(); renderHours(); renderBag(); syncCartaButtons(); });
   setupBag();
   setupCarta();
   setupScratch();
