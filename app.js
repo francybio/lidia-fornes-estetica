@@ -181,7 +181,7 @@ function renderBag() {
   $$('[data-bag-count]').forEach(el => el.textContent = n);
   $('.bagbtn').classList.toggle('has-items', n > 0);
   if (!n) {
-    list.innerHTML = '<li class="bag__empty">Tu cita está vacía.<br>Añade tratamientos desde la carta o crea tu pack láser ✿</li>';
+    list.innerHTML = '<li class="bag__empty">Tu cita está vacía.<br>Añade tratamientos desde Servicios o crea tu pack láser ✿</li>';
   } else {
     list.innerHTML = bag.map(i => `<li><div>${i.name}${i.note ? `<small>${i.note}</small>` : ''}</div><strong>${eur(i.price)}</strong><button type="button" data-rm="${i.id}" aria-label="Quitar ${i.name}">×</button></li>`).join('');
   }
@@ -415,7 +415,7 @@ function renderLaser() {
   $('[data-sub]').textContent = eur(calc.sub);
   $('[data-pack-badge]').hidden = !calc.pack;
   if (calc.pack) {
-    $('[data-disc-label]').textContent = 'Precio pack de carta';
+    $('[data-disc-label]').textContent = 'Precio pack cerrado';
     $('[data-disc]').textContent = calc.sub > calc.total ? `−${eur(calc.sub - calc.total)}` : '✓';
   } else {
     $('[data-disc-label]').textContent = calc.rate ? `Descuento −${Math.round(calc.rate * 100)}%` : 'Descuento';
@@ -427,7 +427,7 @@ function renderLaser() {
   $('[data-tier-fill]').style.width = pct + '%';
   $$('.tiers__marks span').forEach((s, i) => s.classList.toggle('is-hit', calc.sub >= [60, 70, 80, 90][i]));
   let msg;
-  if (calc.pack) msg = `✿ ${calc.pack.n}: precio especial de carta.`;
+  if (calc.pack) msg = `✿ ${calc.pack.n}: precio especial.`;
   else if (!calc.sub) msg = 'A partir de 60€ en zonas, empieza el descuento.';
   else {
     const next = [...TIERS].reverse().find(([min]) => calc.sub < min);
@@ -521,7 +521,7 @@ function setupLaser() {
     if (!c.items.length) return;
     const zones = c.items.map(i => i.n).join(', ');
     const name = c.pack ? `Láser · ${c.pack.n}` : 'Pack láser a medida';
-    const note = c.pack ? (c.pack.fixed ? 'pack de carta' : zones) : `${zones}${c.rate ? ` · −${Math.round(c.rate * 100)}%` : ''}`;
+    const note = c.pack ? (c.pack.fixed ? 'pack cerrado' : zones) : `${zones}${c.rate ? ` · −${Math.round(c.rate * 100)}%` : ''}`;
     bagAdd({ name, price: Math.round(c.total * 100) / 100, note });
   });
   setSex('mujer');
@@ -738,7 +738,7 @@ function setupNav() {
   const io = new IntersectionObserver(ens => ens.forEach(en => {
     if (en.isIntersecting) links.forEach(l => l.classList.toggle('is-active', l.getAttribute('href') === '#' + en.target.id));
   }), { rootMargin: '-45% 0px -50% 0px' });
-  ['carta', 'laser', 'promo', 'cabina', 'opiniones', 'visitanos'].forEach(id => { const s = document.getElementById(id); if (s) io.observe(s); });
+  ['servicios', 'laser', 'promo', 'cabina', 'opiniones', 'visitanos'].forEach(id => { const s = document.getElementById(id); if (s) io.observe(s); });
 }
 
 /* ----------------------------------------------------------
