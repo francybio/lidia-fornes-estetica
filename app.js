@@ -8,6 +8,9 @@
    DATOS
 ---------------------------------------------------------- */
 const WA_NUMBER = '34601926591';
+// Estadísticas (GoatCounter, sin cookies): pon aquí el código de la cuenta,
+// p. ej. 'lidiafornes' → https://lidiafornes.goatcounter.com. Vacío = desactivadas.
+const STATS_CODE = '';
 // minutos desde medianoche · 0 = domingo
 const HOURS = {
   0: null,
@@ -224,6 +227,35 @@ function renderHours() {
 function setupWa() {
   const href = waLink(T('wa.hello'));
   $$('[data-wa]').forEach(a => a.setAttribute('href', href));
+}
+
+/* ----------------------------------------------------------
+   ESTADÍSTICAS: clics en WhatsApp, llamar y cómo llegar
+---------------------------------------------------------- */
+const STATS_EVENTS = [
+  ['[data-bag-send]', 'whatsapp-envia-su-cita', 'WhatsApp · Envía su cita desde «Mi cita»'],
+  ['[data-wa]', 'whatsapp-pide-cita', 'WhatsApp · Pulsa «Pide cita»'],
+  ['a[href^="tel:"]', 'llamar', 'Pulsa «Llamar» / teléfono'],
+  ['a[href*="/maps/dir/"]', 'como-llegar', 'Pulsa «Cómo llegar»']
+];
+function setupStats() {
+  if (STATS_CODE && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
+    const sc = document.createElement('script');
+    sc.async = true;
+    sc.src = 'https://gc.zgo.at/count.js';
+    sc.dataset.goatcounter = `https://${STATS_CODE}.goatcounter.com/count`;
+    document.head.appendChild(sc);
+  }
+  document.addEventListener('click', e => {
+    for (const [sel, path, title] of STATS_EVENTS) {
+      const el = e.target.closest(sel);
+      if (!el) continue;
+      if (!el.classList.contains('is-disabled') && window.goatcounter && window.goatcounter.count) {
+        window.goatcounter.count({ path, title, event: true });
+      }
+      return;
+    }
+  }, true);
 }
 
 /* ----------------------------------------------------------
@@ -925,6 +957,7 @@ function runLoader() {
    INIT
 ---------------------------------------------------------- */
 function init() {
+  setupStats();
   setupLang();
   setupWa();
   renderStatus(); renderHours(); setInterval(renderStatus, 60000);
